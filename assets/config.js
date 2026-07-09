@@ -7,19 +7,19 @@
 const NexusConfig = {
     // Discord Application Client ID
     // Get this from: https://discord.com/developers/applications
-    discordClientId: 'YOUR_DISCORD_CLIENT_ID',
+    discordClientId: '1521537524462391447',
 
     // Cloudflare Worker URL
     // Your deployed worker base URL
-    workerUrl: 'https://your-worker.your-subdomain.workers.dev',
+    workerUrl: 'https://nexusaidc.alamer.workers.dev',
 
     // GitHub Pages URL (where this dashboard is hosted)
     // Used for OAuth redirect
-    dashboardUrl: 'https://your-username.github.io/nexusai-dashboard',
+    dashboardUrl: 'https://al4mer.github.io/nexusaidashboard',
 
     // Discord Bot Invite URL
     // Generate at: https://discord.com/developers/applications
-    botInviteUrl: 'https://discord.com/api/oauth2/authorize?client_id=YOUR_CLIENT_ID&permissions=8&scope=bot%20applications.commands'
+    botInviteUrl: 'https://discord.com/oauth2/authorize?client_id=1521537524462391447&permissions=8&integration_type=0&scope=bot+applications.commands'
 };
 
 // Apply configuration to Auth and API modules
