@@ -6,8 +6,8 @@
 const NexusAuth = {
     // Discord OAuth Configuration
     // IMPORTANT: Replace these with your actual Discord application credentials
-    clientId: 'YOUR_DISCORD_CLIENT_ID',
-    redirectUri: 'https://your-username.github.io/nexusai-dashboard/callback.html',
+    clientId: '1521537524462391447',
+    redirectUri: 'https://alamer.github.io/nexusaidashboard/callback.html',
     scope: 'identify guilds',
 
     /**
