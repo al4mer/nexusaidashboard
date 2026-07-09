@@ -19,7 +19,7 @@ const NexusConfig = {
 
     // Discord Bot Invite URL
     // Generate at: https://discord.com/developers/applications
-    botInviteUrl: 'https://discord.com/oauth2/authorize?client_id=1521537524462391447&permissions=8&integration_type=0&scope=bot+applications.commands'
+    botInviteUrl: 'https://discord.com/oauth2/authorize?client_id=1521537524462391447&permissions=8&response_type=code&redirect_uri=https%3A%2F%2Falamer.github.io%2Fnexusaidashboard%2Fcallback.html&integration_type=0&scope=identify+guilds+bot+applications.commands'
 };
 
 // Apply configuration to Auth and API modules
