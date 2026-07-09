@@ -5,7 +5,7 @@
 
 const NexusAPI = {
     // Configuration - Update this to your Cloudflare Worker URL
-    baseUrl: 'https://your-worker.your-subdomain.workers.dev',
+    baseUrl: 'https://nexusaidc.alamer.workers.dev',
 
     /**
      * Set the base URL for API calls
