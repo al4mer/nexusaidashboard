@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NexusAI - Authenticating...</title>
+    <link rel="stylesheet" href="assets/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="login-page">
+    <div class="login-container">
+        <div class="login-card">
+            <div class="spinner-large" style="margin: 0 auto var(--spacing-xl);"></div>
+            <h1 class="login-title">Authenticating...</h1>
+            <p class="login-subtitle">Please wait while we complete your login</p>
+        </div>
+    </div>
+
+    <script src="assets/config.js"></script>
+    <script src="assets/api.js"></script>
+    <script src="assets/auth.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                const result = await NexusAuth.checkCallback();
+                if (result) {
+                    window.location.href = 'servers.html';
+                } else {
+                    // No callback parameters, redirect to login
+                    window.location.href = 'index.html';
+                }
+            } catch (error) {
+                console.error('Authentication error:', error);
+                document.querySelector('.login-card').innerHTML = `
+                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="var(--error)" stroke-width="1.5">
+                        <circle cx="12" cy="12" r="10"/>
+                        <line x1="12" y1="8" x2="12" y2="12"/>
+                        <line x1="12" y1="16" x2="12.01" y2="16"/>
+                    </svg>
+                    <h1 class="login-title" style="color: var(--error);">Authentication Failed</h1>
+                    <p class="login-subtitle">${error.message}</p>
+                    <button class="discord-login-btn" onclick="window.location.href='index.html'" style="margin-top: var(--spacing-lg);">
+                        <span>Go back to Login</span>
+                    </button>
+                `;
+            }
+        });
+    </script>
+</body>
+</html>
