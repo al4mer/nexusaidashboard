@@ -1,7 +1,9 @@
 /**
- * NexusAI Dashboard Logic
+ * NexusAI Dashboard Logic (D1 Version)
  * Handles all dashboard interactions and data management
  */
+
+const WORKER_URL = "https://DEIN-WORKER.workers.dev"; // <-- anpassen
 
 // Global state
 let currentServerId = null;
@@ -45,6 +47,35 @@ const PERSONALITY_PRESETS = {
 };
 
 /**
+ * Load from Worker (D1)
+ */
+async function loadFromWorker(guildId) {
+    const res = await fetch(`${WORKER_URL}/load?guildId=${guildId}`);
+    if (!res.ok) return {};
+    return await res.json();
+}
+
+/**
+ * Save to Worker (D1)
+ */
+async function saveToWorker() {
+    const payload = {
+        settings: serverData.settings || {},
+        personality: serverData.personality || null,
+        keys: serverData.keys || []
+    };
+
+    await fetch(`${WORKER_URL}/save`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            guildId: currentServerId,
+            data: payload
+        })
+    });
+}
+
+/**
  * Initialize the dashboard
  * @param {string} serverId - Discord guild ID
  */
@@ -54,15 +85,16 @@ async function initDashboard(serverId) {
     showLoading(true);
 
     try {
-        // Load all server data in parallel
-        const [settings, personality, channels, keys] = await Promise.all([
-            NexusAPI.getGuildSettings(serverId).catch(() => null),
-            NexusAPI.getPersonality(serverId).catch(() => null),
-            NexusAPI.getChannels(serverId).catch(() => []),
-            NexusAPI.getKeys(serverId).catch(() => [])
+        // Load stored data from Worker + channels from Discord
+        const [stored, channels] = await Promise.all([
+            loadFromWorker(serverId).catch(() => ({})),
+            NexusAPI.getChannels(serverId).catch(() => [])
         ]);
 
-        serverData = { settings, personality, channels, keys };
+        serverData.settings = stored.settings || {};
+        serverData.personality = stored.personality || null;
+        serverData.keys = stored.keys || [];
+        serverData.channels = channels || [];
 
         // Update UI
         updateServerHeader();
@@ -85,7 +117,6 @@ async function initDashboard(serverId) {
  * Update server header with server info
  */
 function updateServerHeader() {
-    // Server info is loaded from the guilds list or stored
     const serverInfo = JSON.parse(sessionStorage.getItem('serverInfo') || '{}');
 
     if (serverInfo.icon) {
@@ -103,16 +134,12 @@ function updateServerHeader() {
 function updateOverview() {
     const settings = serverData.settings || {};
 
-    // Update stats
     document.getElementById('messagesToday').textContent = settings.messagesToday || '--';
     document.getElementById('botStatus').textContent = settings.active ? 'Active' : 'Inactive';
     document.getElementById('botStatus').className = settings.active ? 'stat-value stat-active' : 'stat-value';
 
-    // API keys count
-    document.getElementById('apiKeysCount').textContent =
-        serverData.keys?.length || 0;
+    document.getElementById('apiKeysCount').textContent = serverData.keys?.length || 0;
 
-    // AI Channel
     const channel = serverData.channels?.find(c => c.id === settings.aiChannel);
     document.getElementById('aiChannel').textContent = channel ? `#${channel.name}` : 'Not set';
 }
@@ -124,11 +151,9 @@ function populateSettings() {
     const settings = serverData.settings || {};
     const channels = serverData.channels || [];
 
-    // Language
     document.getElementById('languageSelect').value = settings.language || 'en';
     document.getElementById('autoDetect').checked = settings.autoDetect || false;
 
-    // Channels dropdown
     const channelSelect = document.getElementById('channelSelect');
     channelSelect.innerHTML = '<option value="">-- Select a channel --</option>';
 
@@ -203,7 +228,7 @@ function populateKeys() {
         return;
     }
 
-    keysList.innerHTML = keys.map((key, index) => `
+    keysList.innerHTML = keys.map((key) => `
         <div class="key-item">
             <div class="key-icon">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -212,7 +237,7 @@ function populateKeys() {
             </div>
             <div class="key-info">
                 <div class="key-name">${escapeHtml(key.name)}</div>
-                <div class="key-value">${maskApiKey(key.keyPreview || key.key)}</div>
+                <div class="key-value">${maskApiKey(key.key || key.keyPreview || '')}</div>
             </div>
             <div class="key-actions">
                 <button class="key-action-btn" onclick="renameApiKey('${key.id}')" title="Rename">
@@ -233,25 +258,21 @@ function populateKeys() {
 
 /**
  * Navigate to a specific tab
- * @param {string} tabId - Tab identifier
  */
 function navigateToTab(tabId) {
-    // Update nav items
     document.querySelectorAll('.nav-item[data-tab]').forEach(item => {
         item.classList.toggle('active', item.dataset.tab === tabId);
     });
 
-    // Update tab content
     document.querySelectorAll('.tab-content').forEach(tab => {
         tab.classList.toggle('active', tab.id === `tab-${tabId}`);
     });
 
-    // Update URL hash
     window.location.hash = tabId;
 }
 
 /**
- * Save personality settings
+ * Save personality settings (D1)
  */
 async function savePersonality() {
     const personality = {
@@ -265,8 +286,8 @@ async function savePersonality() {
     showLoading(true);
 
     try {
-        await NexusAPI.updatePersonality(currentServerId, personality);
         serverData.personality = personality;
+        await saveToWorker();
         showToast('Personality saved successfully', 'success');
     } catch (error) {
         showToast('Failed to save personality: ' + error.message, 'error');
@@ -275,17 +296,10 @@ async function savePersonality() {
     }
 }
 
-/**
- * Reset personality to default
- */
 function resetPersonality() {
     loadPreset('assistant');
 }
 
-/**
- * Load a personality preset
- * @param {string} presetName - Preset identifier
- */
 function loadPreset(presetName) {
     const preset = PERSONALITY_PRESETS[presetName];
     if (!preset) return;
@@ -300,7 +314,7 @@ function loadPreset(presetName) {
 }
 
 /**
- * Save language settings
+ * Save language settings (D1)
  */
 async function saveLanguage() {
     const language = document.getElementById('languageSelect').value;
@@ -309,10 +323,10 @@ async function saveLanguage() {
     showLoading(true);
 
     try {
-        await NexusAPI.updateLanguage(currentServerId, language);
         serverData.settings = serverData.settings || {};
         serverData.settings.language = language;
         serverData.settings.autoDetect = autoDetect;
+        await saveToWorker();
         showToast('Language settings saved', 'success');
     } catch (error) {
         showToast('Failed to save language: ' + error.message, 'error');
@@ -322,7 +336,7 @@ async function saveLanguage() {
 }
 
 /**
- * Save channel settings
+ * Save channel settings (D1)
  */
 async function saveChannel() {
     const channelId = document.getElementById('channelSelect').value;
@@ -332,11 +346,11 @@ async function saveChannel() {
     showLoading(true);
 
     try {
-        await NexusAPI.updateChannel(currentServerId, channelId);
         serverData.settings = serverData.settings || {};
         serverData.settings.aiChannel = channelId;
         serverData.settings.allChannels = allChannels;
         serverData.settings.prefix = prefix;
+        await saveToWorker();
         updateOverview();
         showToast('Channel settings saved', 'success');
     } catch (error) {
@@ -347,11 +361,11 @@ async function saveChannel() {
 }
 
 /**
- * Save auto reply settings
+ * Save auto reply settings (D1)
  */
 async function saveAutoReply() {
     const settings = {
-        enabled: document.getElementById('autoreplyEnabled').checked,
+        autoReplyEnabled: document.getElementById('autoreplyEnabled').checked,
         responseChance: parseInt(document.getElementById('responseChance').value),
         cooldown: parseInt(document.getElementById('cooldown').value) || 3,
         triggerKeywords: document.getElementById('triggerKeywords').value
@@ -369,9 +383,9 @@ async function saveAutoReply() {
     showLoading(true);
 
     try {
-        await NexusAPI.updateAutoReply(currentServerId, settings);
         serverData.settings = serverData.settings || {};
         Object.assign(serverData.settings, settings);
+        await saveToWorker();
         showToast('Auto-reply settings saved', 'success');
     } catch (error) {
         showToast('Failed to save auto-reply: ' + error.message, 'error');
@@ -380,9 +394,6 @@ async function saveAutoReply() {
     }
 }
 
-/**
- * Reset auto reply to defaults
- */
 function resetAutoReply() {
     document.getElementById('autoreplyEnabled').checked = false;
     document.getElementById('autoreplyStatus').textContent = 'Disabled';
@@ -397,7 +408,7 @@ function resetAutoReply() {
 }
 
 /**
- * Add a new API key
+ * Add a new API key (D1)
  */
 async function addApiKey() {
     const name = document.getElementById('newKeyName').value.trim();
@@ -416,15 +427,17 @@ async function addApiKey() {
     showLoading(true);
 
     try {
-        const result = await NexusAPI.addKey(currentServerId, name, key);
         serverData.keys = serverData.keys || [];
-        serverData.keys.push(result);
+        serverData.keys.push({
+            id: Date.now().toString(),
+            name,
+            key
+        });
 
-        // Clear inputs
         document.getElementById('newKeyName').value = '';
         document.getElementById('newKeyValue').value = '';
 
-        // Refresh list
+        await saveToWorker();
         populateKeys();
         updateOverview();
 
@@ -437,8 +450,7 @@ async function addApiKey() {
 }
 
 /**
- * Remove an API key
- * @param {string} keyId - Key ID to remove
+ * Remove an API key (D1)
  */
 async function removeApiKey(keyId) {
     if (!confirm('Are you sure you want to remove this API key?')) {
@@ -448,8 +460,8 @@ async function removeApiKey(keyId) {
     showLoading(true);
 
     try {
-        await NexusAPI.removeKey(currentServerId, keyId);
-        serverData.keys = serverData.keys.filter(k => k.id !== keyId);
+        serverData.keys = (serverData.keys || []).filter(k => k.id !== keyId);
+        await saveToWorker();
         populateKeys();
         updateOverview();
         showToast('API key removed', 'success');
@@ -461,11 +473,10 @@ async function removeApiKey(keyId) {
 }
 
 /**
- * Rename an API key
- * @param {string} keyId - Key ID to rename
+ * Rename an API key (D1)
  */
 async function renameApiKey(keyId) {
-    const currentKey = serverData.keys.find(k => k.id === keyId);
+    const currentKey = (serverData.keys || []).find(k => k.id === keyId);
     const newName = prompt('Enter a new name for this key:', currentKey?.name || '');
 
     if (!newName || !newName.trim()) {
@@ -475,11 +486,11 @@ async function renameApiKey(keyId) {
     showLoading(true);
 
     try {
-        await NexusAPI.renameKey(currentServerId, keyId, newName.trim());
-        const key = serverData.keys.find(k => k.id === keyId);
+        const key = (serverData.keys || []).find(k => k.id === keyId);
         if (key) {
             key.name = newName.trim();
         }
+        await saveToWorker();
         populateKeys();
         showToast('API key renamed', 'success');
     } catch (error) {
@@ -489,19 +500,11 @@ async function renameApiKey(keyId) {
     }
 }
 
-/**
- * Toggle API key visibility
- * @param {string} inputId - Input element ID
- */
 function toggleKeyVisibility(inputId) {
     const input = document.getElementById(inputId);
     input.type = input.type === 'password' ? 'text' : 'password';
 }
 
-/**
- * Show/hide loading overlay
- * @param {boolean} show - Whether to show loading
- */
 function showLoading(show) {
     const overlay = document.getElementById('loadingOverlay');
     if (overlay) {
@@ -509,11 +512,6 @@ function showLoading(show) {
     }
 }
 
-/**
- * Show toast notification
- * @param {string} message - Toast message
- * @param {string} type - Toast type (success, error, info)
- */
 function showToast(message, type = 'info') {
     const container = document.getElementById('toastContainer');
     if (!container) return;
@@ -530,7 +528,6 @@ function showToast(message, type = 'info') {
     toast.innerHTML = `${icons[type] || icons.info}<span>${escapeHtml(message)}</span>`;
     container.appendChild(toast);
 
-    // Auto remove after 4 seconds
     setTimeout(() => {
         toast.style.opacity = '0';
         toast.style.transform = 'translateX(100%)';
@@ -538,28 +535,17 @@ function showToast(message, type = 'info') {
     }, 4000);
 }
 
-/**
- * Escape HTML to prevent XSS
- * @param {string} text - Text to escape
- * @returns {string} Escaped text
- */
 function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
 }
 
-/**
- * Mask an API key for display
- * @param {string} key - API key
- * @returns {string} Masked key
- */
 function maskApiKey(key) {
     if (!key || key.length < 8) return '****';
     return key.substring(0, 4) + '...' + key.substring(key.length - 4);
 }
 
-// Handle initial tab from URL hash
 window.addEventListener('load', () => {
     const hash = window.location.hash.slice(1);
     if (hash) {
